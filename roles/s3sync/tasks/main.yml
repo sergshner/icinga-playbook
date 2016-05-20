@@ -1,0 +1,18 @@
+---
+# These task scripts for sync to Amazon S3
+- name: ensure s3cmd package is installed  
+  yum: name=s3cmd state=present enablerepo=epel-testing
+- name: Copy s3cmd config file
+  template: src=.s3cfg.j2 dest={{ ansible_env.HOME}}/.s3cfg
+- name: Clone git repository
+  git: repo=https://github.com/sergshner/s3sync.git dest=/opt/icinga-scripts/s3sync force=yes
+- name: Make scripts executable
+  file: path=/opt/icinga-scripts/s3sync mode=0755 recurse=yes
+- name: Apply parameters to init script
+  template: src=/opt/icinga-scripts/s3sync/s3sync_init.sh dest=/opt/icinga-scripts/s3sync/s3sync_init.sh
+- name: Ensure backup directory exists
+  file: path=/var/docker/backups mode=0644 state=directory
+- name: Create cron for logs sync
+  cron: name="s3sync_logs" minute="0" hour="19" job="/opt/icinga-scripts/s3sync/s3sync_logs.sh >/dev/null 2>&1"
+- name: Create cron for backups sync
+  cron: name="s3sync_backups" minute="0" hour="3" job="/opt/icinga-scripts/s3sync/s3sync_backups.sh >/dev/null 2>&1"

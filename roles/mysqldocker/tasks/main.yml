@@ -1,0 +1,12 @@
+---
+# These task installs and enables mysql docker container
+- name: Clone git repository
+  git: repo=https://github.com/sergshner/mysql-docker.git dest=/opt/icinga-scripts/mysql-docker
+- name: Build docker image
+  command: docker build --rm=true --no-cache=true -t mysql /opt/icinga-scripts/mysql-docker
+- name: Install mysql-docker service
+  command: cp /opt/icinga-scripts/mysql-docker/mysql-docker.service /etc/systemd/system/mysql-docker.service
+- name: Run container
+  command: docker run --name mysql_c -v /opt/icinga-scripts/mysql-docker/my.cnf:/etc/my.cnf -v /var/docker/log/mysql:/var/log/mysql -e MYSQL_ROOT_PASSWORD="{{ mysql_root_password }}" -e MYSQL_USER="{{ mysql_icinga_user_name }}" -e MYSQL_PASSWORD="{{ mysql_icinga_user_password }}" -e MYSQL_DATABASE="{{ mysql_icinga_db_name }}" -p 3307:3306 -d mysql
+- name: Start mysql-docker service
+  service: name=mysql-docker state=running enabled=yes 

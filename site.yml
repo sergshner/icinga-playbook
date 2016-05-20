@@ -1,0 +1,10 @@
+---
+- name: install and configure Icinga Monitoring solution
+  hosts: all
+  remote_user: 
+  sudo: yes
+  roles:
+    #- icingaserver
+    #- apachedocker
+    #- mysqldocker
+    - s3sync

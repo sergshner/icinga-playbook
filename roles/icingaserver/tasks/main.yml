@@ -1,0 +1,71 @@
+---
+# These task installs and enables icinga server
+- name: ensure icinga rpm key imported
+  rpm_key: state=present key=http://packages.icinga.org/icinga.key
+- name: download icinga-release.repo  
+  get_url: url=http://packages.icinga.org/epel/ICINGA-release.repo dest=/etc/yum.repos.d/ICINGA-release.repo mode=0640
+- name: ensure icinga2 package is installed  
+  yum: name=icinga2 state=present
+- name: ensure icinga2 is running
+  service: name=icinga2 state=running enabled=yes
+- name: ensure mariadb server package is installed  
+  yum: name={{ item }} state=present
+  with_items:
+    - mariadb-server
+    - mariadb
+    - MySQL-python
+- name: ensure mariadb is running
+  service: name=mariadb state=running enabled=yes
+- name: delete anonymous MySQL server user for {{ ansible_hostname }}
+  action: mysql_user user="" host="{{ ansible_hostname }}" state="absent"
+  ignore_errors: yes
+- name: delete anonymous MySQL server user for localhost
+  action: mysql_user user="" state="absent"
+  ignore_errors: yes
+- name: remove the MySQL test database
+  action: mysql_db db=test state=absent   
+  ignore_errors: yes
+# 'localhost' needs to be the last item for idempotency, see
+# http://ansible.cc/docs/modules.html#mysql-user   
+- name: Change root user password on first run
+  mysql_user: login_user=root
+              login_password=''
+              name=root
+              password={{ mysql_root_password }}
+              priv=*.*:ALL,GRANT
+              host={{ item }}
+  with_items:
+    - "{{ ansible_hostname }}"
+  ignore_errors: yes
+- name: Create icinga2 database and user
+  command: 'mysql -h"{{ ansible_hostname }}" -uroot -p"{{ mysql_root_password }}" -ne "{{ item }}"'
+  with_items:
+    - CREATE DATABASE IF NOT EXISTS {{ mysql_icinga_db_name }}
+    - GRANT SELECT, INSERT, UPDATE, DELETE, DROP, CREATE VIEW, INDEX, EXECUTE ON {{ mysql_icinga_db_name }}.* TO '{{ mysql_icinga_user_name }}'@'localhost' IDENTIFIED BY '"{{ mysql_icinga_user_password }}"'
+  changed_when: False
+- name: Installing MySQL IDO Module
+  yum: name=icinga2-ido-mysql state=present
+- name: Import the Icinga 2 IDO schema
+  template: src=ido-mysql.conf.j2 dest=/etc/icinga2/features-available/ido-mysql.conf
+- name: Web server Setup
+  yum: name=httpd state=present
+- name: ensure httpd is running
+  service: name=httpd state=running enabled=yes
+- name: ensure iptables package is installed  
+  yum: name=iptables-services state=present
+- name: ensure iptables is running
+  service: name=iptables state=running enabled=yes
+  sudo: true
+- name: Apache | add apache iptable rule
+  command: /sbin/iptables -I INPUT 1 -p tcp --dport http -j ACCEPT -m comment --comment "Apache"
+- name: save iptables
+  command: service iptables save
+- name: restart iptables
+  service: name=iptables state=restarted  
+- command: 'icinga2 feature enable command'  
+  notify: restart icinga2
+- name: Icinga Web 2 Installation
+  yum: name={{ item }} state=present
+  with_items:
+    - icingaweb2
+    - icingacli

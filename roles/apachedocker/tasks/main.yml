@@ -1,0 +1,12 @@
+---
+# These task installs and enables apache web server docker container
+- name: Clone git repository
+  git: repo=https://github.com/sergshner/httpd-docker.git dest=/opt/icinga-scripts/httpd-docker
+- name: Build docker image
+  command: docker build --rm=true --no-cache=true -t httpd /opt/icinga-scripts/httpd-docker
+- name: Install httpd-docker service
+  command: cp /opt/icinga-scripts/httpd-docker/httpd-docker.service /etc/systemd/system/httpd-docker.service
+- name: Run container
+  command: docker run --name httpd_c -v /var/docker/log/httpd:/var/log/httpd -p 81:80 -d httpd
+- name: Start httpd-docker service
+  service: name=httpd-docker state=running enabled=yes 
